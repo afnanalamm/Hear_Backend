@@ -5,48 +5,46 @@ from models import Post
 @app.route("/allposts", methods= ["GET"])
 def get_posts():
     allposts = Post.query.all()
-    json_allposts = list(map(lambda x: x.to_json(), allposts))
-    return jsonify(json_allposts) # just "allposts": was removed
+
+    json_allposts = (list(map(lambda x: x.to_json(), allposts)))
+    lastToFirst_allposts = json_allposts[::-1]
+
+    return jsonify(lastToFirst_allposts)
+
 
 @app.route("/create_post", methods=["POST"])
 def create_post():
-    username = request.json.get("username")
-    description = request.json.get("description")
-    postType = request.json.get("postType")
-    mediaFilepath = request.json.get("mediaFilepath")
-    deadline = request.json.get("date")
-    location = request.json.get("location")
-    tags = request.json.get("tags")
+    data = request.json
+    required_fields = ["userID", "description", "postType", "deadline", "location"]
+    
+    # Check for required fields
+    if not all(data.get(field) for field in required_fields):
+        return jsonify({"message": "Missing required fields: Description, deadline, location"}), 400
 
-    mediaAttached = request.json.get("mediaAttached")
+    # Prepare post data
+    post_data = {
+        "userID": data["userID"],
+        "description": data["description"],
+        "postType": data["postType"],
+        "deadline": data["deadline"],
+        "location": data["location"],
+        "mediaURL": data["mediaURL"],
+        "tags": data["tags"],
+        "createdOn": data["createdOn"]
+    }
 
-
-    if not username or not description or not postType or not date or not location:
-        return (
-            jsonify({"message": "You must include a username, description, date, post type and location"}),
-            400,
-        )
-
-    if not mediaFilepath and not tags:
-        new_post = Post(username = username, description = description, postType = postType, 
-                        date = deadline, location = location)
-    elif not mediaFilepath:
-        new_post = Post(username = username, description = description, postType = postType, 
-                        date = deadline, location = location, tags = tags)
-    elif not tags:
-        new_post = Post(username = username, description = description, postType = postType, 
-                        mediaFilepath = mediaFilepath, date = deadline, location = location)
-    else:
-        new_post = Post(username = username, description = description, postType = postType, 
-                        mediaFilepath = mediaFilepath, date = deadline, location = location,
-                        tags = tags)
-
+    # Create new post
+    new_post = Post(**{k: v for k, v in post_data.items()}) # Only include non-None values. This avoids multiple conditionals. This uses dictionary unpacking.
+    print("New post to be added:", new_post.to_json())      
 
     try:
         db.session.add(new_post)
+        
         db.session.commit()
+        print("New post added:", new_post)
     except Exception as e:
         return jsonify({"message": str(e)}), 400
+        
     
     return jsonify({"message": "Post added!"}), 201
 
@@ -88,6 +86,43 @@ if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5001, debug=True)
     
         
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
