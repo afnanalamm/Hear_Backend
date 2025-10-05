@@ -1,8 +1,9 @@
+# from sqlalchemy import DateTime, Date, Boolean, String, Integer, ForeignKey
 from config import db
 
 class Address(db.Model):
     __tablename__ = 'addresses'
-    addressID = db.Column(db.Integer, primary_key = True)
+    addressID = db.Column(db.Integer, primary_key = True, autoincrement=True)
     addressLine1 = db.Column(db.String(100), nullable = False)
     addressLine2 = db.Column(db.String(100), nullable = True)
     city = db.Column(db.String(50), nullable = False)
@@ -21,7 +22,7 @@ class Address(db.Model):
 
 class Comment(db.Model):
     __tablename__ = 'comments'
-    commentID = db.Column(db.Integer, primary_key = True)
+    commentID = db.Column(db.Integer, primary_key = True, autoincrement=True)
     postID = db.Column(db.String(80),  nullable = False)
     userID = db.Column(db.String(80),  nullable = False)
 
@@ -39,7 +40,7 @@ class Comment(db.Model):
 
 class Interaction(db.Model):
     __tablename__ = 'interactions'
-    interactionsID = db.Column(db.Integer, primary_key = True)
+    interactionsID = db.Column(db.Integer, primary_key = True, autoincrement=True)
     postID = db.Column(db.String(80),  nullable = False)
 
     numAgree = db.Column(db.String(10), nullable = False)
@@ -59,7 +60,7 @@ class Interaction(db.Model):
 
 class Notification(db.Model):
     __tablename__ = 'notifications'
-    notificationID = db.Column(db.Integer, primary_key = True)
+    notificationID = db.Column(db.Integer, primary_key = True, autoincrement=True)
     userID = db.Column(db.String(80),  nullable = False)
     postID = db.Column(db.String(80),  nullable = False)
     commentID = db.Column(db.String(80),  nullable = False)
@@ -82,7 +83,7 @@ class Notification(db.Model):
 
 class Post(db.Model):
     __tablename__ = 'posts'
-    postID = db.Column(db.Integer, primary_key = True)
+    postID = db.Column(db.Integer, primary_key = True, autoincrement=True)
     userID = db.Column(db.String(80),  nullable = False)
 
     interactionsID = db.Column(db.String(80))
@@ -120,28 +121,28 @@ class Post(db.Model):
 
 class User(db.Model):
     __tablename__ = 'users'
-    userID = db.Column(db.Integer, primary_key = True)
-    addressID = db.Column(db.String(10), nullable = False)
+    userID = db.Column(db.Integer, primary_key = True, autoincrement=True)
+    addressID = db.Column(db.String(80), nullable = True)
 
-    username = db.Column(db.String(80),  nullable = False)
+    username = db.Column(db.String(80),  nullable = False, unique=True, index= True)
     firstName = db.Column(db.String(80),  nullable = False)
-    lasttName = db.Column(db.String(80),  nullable = False)
-    dateOfBirth = db.Column(db.String(20), nullable = False)
+    lastName = db.Column(db.String(80),  nullable = False)
+    dateOfBirth = db.Column(db.String(80), nullable = False)
 
     contactNumber = db.Column(db.String(20), nullable = False)
-    emailAddress = db.Column(db.String(100), nullable = False)
-    passwordHash = db.Column(db.String(1000), nullable = False)
+    emailAddress = db.Column(db.String(80), nullable = False, unique=True, index=True)
+    passwordHash = db.Column(db.String(300), nullable = False)
 
-    superUser = db.Column(db.String(10), nullable = False)
-    createdOn = db.Column(db.String(20), nullable = False)
+    superUser = db.Column(db.String(10), nullable = True)
+    createdOn = db.Column(db.String(80), nullable = False)
 
     def to_json(self):
         return {
             "userID" : self.userID,
-            "addressID" : self.addressID,
+            # "addressID" : self.addressID,
             "username": self.username,
             "firstName" : self.firstName,
-            "lasttName" : self.lasttName,
+            "lastName" : self.lastName,
             "dateOfBirth" : self.dateOfBirth,
             "contactNumber": self.contactNumber,
             "emailAddress" : self.emailAddress,
@@ -205,7 +206,7 @@ class User(db.Model):
 # from config import db
 
 # class Post(db.Model):
-#     id = db.Column(db.Integer, primary_key = True)
+#     id = db.Column(db.Integer, primary_key = True, autoincrement=True)
 #     username = db.Column(db.String(80),  nullable = False)
 #     description = db.Column(db.String(80),  nullable = False)
 #     postType = db.Column(db.String(10), nullable = False)

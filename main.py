@@ -1,6 +1,27 @@
 from flask import request, jsonify
 from config import app, db
-from models import Post
+from models import *
+from sqlalchemy import *
+
+@app.route("/check_login", methods=["POST"])
+def check_login():
+    try:
+        login_data = request.json
+        requestPasswordHash = login_data["passwordHash"]
+        requestEmailAddress = login_data["emailAddress"]
+        realPasswordHash = select(User).where(User.emailAddress == requestEmailAddress).first().passwordHash
+        if (requestPasswordHash == realPasswordHash) and (requestEmailAddress == (select(User).where(User.emailAddress == requestEmailAddress).first().emailAddress)):
+            return 200
+
+        else:
+            return jsonify({"Message": "Incorrect Attempt"}), 400
+
+    except Exception as e:
+        return jsonify({"Message": "Incorrect Attempt"}), 400
+        
+    
+
+
 
 @app.route("/allposts", methods= ["GET"])
 def get_posts():
@@ -9,7 +30,7 @@ def get_posts():
     json_allposts = (list(map(lambda x: x.to_json(), allposts)))
     lastToFirst_allposts = json_allposts[::-1]
 
-    return jsonify(lastToFirst_allposts)
+    return jsonify(lastToFirst_allposts), 200
 
 
 @app.route("/create_post", methods=["POST"])
@@ -48,21 +69,46 @@ def create_post():
     
     return jsonify({"message": "Post added!"}), 201
 
-# @app.route("/update_post/<int:post_id>", methods = ["PATCH"])
-# def update_post(post_id):
-#     post = Post.query.get(post_id)
 
-#     if not post:
-#         return jsonify({"message": "Post not found!"}), 404
+@app.route("/create_account", methods=["POST"])
+def create_account():
+    data = request.json
+    required_fields = ["firstName", "lastName", "dateOfBirth", "contactNumber", "emailAddress", "username"]
     
-#     data = request.json
-#     post.username = data.get("username", post.username)
-#     post.description = data.get("description", post.description)
-#     post.location = data.get("location", post.location)
+    # Check for required fields
+    # if not all(data.get(field) for field in required_fields):
+    #     return jsonify({"message": "Missing required fields: Description, deadline, location"}), 400
 
-#     db.session.commit()
+    # create new account
+    account_data = {
+        
+        "username": data["username"],
+        "firstName": data["firstName"],
+        "lastName": data["lastName"],
+        "dateOfBirth": data["dateOfBirth"],
+        "contactNumber": data["contactNumber"],
+        "emailAddress": data["emailAddress"],
+        "passwordHash": data["passwordHash"],
+        "superUser": data["superUser"],
+        "createdOn": data["createdOn"]
+    }
 
-#     return jsonify({"message": "Post updated!"}), 200
+    # Create new post
+    new_account = User(**{k: v for k, v in account_data.items()}) # Only include non-None values. This avoids multiple conditionals. This uses dictionary unpacking.
+
+  
+    try:
+        db.session.add(new_account)
+        
+        db.session.commit()
+        print("New account created:", new_account)
+    except Exception as e:
+        return jsonify({"message": str(e)}), 400
+
+
+    return jsonify({"message": "Account created!"}), 201
+
+
 
 @app.route("/delete_post/<int:post_id>", methods = ["DELETE"])
 def delete_post(post_id):
