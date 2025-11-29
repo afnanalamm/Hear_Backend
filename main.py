@@ -6,11 +6,13 @@ from models import *
 from sqlalchemy import *
 from datetime import datetime
 
-UPLOAD_FOLDER = 'uploads'
+
+
+UPLOAD_FOLDER = 'uploads' # constant name for for folder to store all uploaded media files
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-@app.route("/check_login", methods=["POST"])
+@app.route("/check_login", methods=["POST"]) # rudimentary login check function
 def check_login():
     try:
         login_data = request.json
@@ -20,10 +22,11 @@ def check_login():
         # Fetch user by email
         user = db.session.execute(
             select(User).where(User.emailAddress == requestEmailAddress)
-        ).scalars().first()
+        ).scalars().first() # Get the first matching user
 
-        if user and user.passwordHash == requestPasswordHash:
-            return jsonify({"message": "Login successful"}), 200
+        if user and user.passwordHash == requestPasswordHash: # Compare password hashes
+            print("User logged in:", user)
+            return jsonify({"message": "Login successful"}), 200 # Send successful login response
         else:
             return jsonify({"message": "Incorrect Attempt"}), 400
 
@@ -32,17 +35,20 @@ def check_login():
 
         
 
-@app.route("/create_account", methods=["POST"])
+@app.route("/create_account", methods=["POST"]) # create new user account
 def create_account():
     data = request.json
-    required_fields = ["firstName", "lastName", "dateOfBirth", "contactNumber", "emailAddress", "username"]
+    required_fields = ["firstName", "lastName", "dateOfBirth", "contactNumber", "emailAddress", "username"] 
+    # can't create account without these fields
     
-    # Check for required fields
+    (
+        # Check for required fields
     # if not all(data.get(field) for field in required_fields):
     #     return jsonify({"message": "Missing required fields: Description, deadline, location"}), 400
 
     # create new account
-    account_data = {
+    )
+    account_data = { # prepare account data, to be used to create new account object
         
         "username": data["username"],
         "firstName": data["firstName"],
@@ -55,7 +61,8 @@ def create_account():
         "superUser": data["superUser"],
         "createdOn": datetime.now()
 
-        # firstName: firstName,
+
+        # firstName: firstName, # commented out lines are to be used in future for more detailed user profiles
         # lastName: lastName,
         # username: username,
         # dateOfBirth: dateOfBirth,
@@ -71,14 +78,16 @@ def create_account():
     }
 
     # Create new post
-    new_account = User(**{k: v for k, v in account_data.items()}) # Only include non-None values. This avoids multiple conditionals. This uses dictionary unpacking.
+    new_account = User(**{k: v for k, v in account_data.items()}) 
+
+    # Only include non-None values. This avoids multiple conditionals. This uses dictionary unpacking.
 
   
     try:
-        db.session.add(new_account)
+        db.session.add(new_account) # add new account to database
         
         db.session.commit()
-        print("New account created:", new_account)
+        print("New account created:", new_account.to_json())
     except Exception as e:
         return jsonify({"message": str(e)}), 400
 
@@ -87,12 +96,12 @@ def create_account():
   
     
 
-@app.route("/allposts", methods= ["GET"])
+@app.route("/allposts", methods= ["GET"]) # get all posts from database
 def get_posts():
     allposts = Post.query.all()
 
-    json_allposts = (list(map(lambda x: x.to_json(), allposts)))
-    lastToFirst_allposts = json_allposts[::-1]
+    json_allposts = (list(map(lambda x: x.to_json(), allposts))) # convert all post objects to json format
+    lastToFirst_allposts = json_allposts[::-1] # reverse order sorting to show latest posts first
 
     return jsonify(lastToFirst_allposts), 200
 
@@ -100,12 +109,13 @@ def get_posts():
 @app.route("/create_post", methods=["POST"])
 def create_post():
     data = request.json
-    # required_fields = ["userID", "description", "postType", "deadline", "location", "title"]
+    (
+        # required_fields = ["userID", "description", "postType", "deadline", "location", "title"]
     
     # # Check for required fields
     # if not all(data.get(field) for field in required_fields):
     #     return jsonify({"message": "Missing required fields: Description, deadline, location, title"}), 400
-
+    )
     # Prepare post data
     post_data = {
         "userID": data["userID"],
@@ -115,13 +125,18 @@ def create_post():
         "postType": data["postType"],
         "deadline": data["deadline"],
         "location": data["location"],
-        "mediaURL": secure_filename(data["mediaURL"]),
+        "mediaURL": secure_filename(data["mediaURL"]), # this just generates a secure filename, the actual file upload will handled separately
         "tags": data["tags"],
         "createdOn": datetime.now()
     }
 
     # Create new post
-    new_post = Post(**{k: v for k, v in post_data.items()}) # Only include non-None values. This avoids multiple conditionals. This uses dictionary unpacking.
+    new_post = Post(**{k: v for k, v in post_data.items()})
+
+    # During refactoring, I had added "if v is not None" to filter out None values, 
+    # but I removed it as it was creating an SQL IntegrityError due to NOT NULL constraints on posts.createdOn
+    # If needed in future, can re-add with better conditional checks.
+
     print("New post to be added:", new_post.to_json())      
 
     try:
@@ -136,7 +151,7 @@ def create_post():
     return jsonify({"message": "Post added!"}), 201
 
 
-@app.route('/upload_media', methods=['POST'])
+@app.route('/upload_media', methods=['POST']) # upload media file endpoint
 def upload_image():
     if 'media' not in request.files:
         return jsonify({'message': 'No media provided'}), 400
@@ -152,12 +167,14 @@ def upload_image():
 
 
 
-@app.route('/uploads/<path:mediaURL>')
+@app.route('/uploads/<path:mediaURL>') # serve uploaded media files to clients
 def serve_uploaded_file(mediaURL):
     return send_from_directory(UPLOAD_FOLDER, mediaURL)
 
 
-@app.route("/delete_post/<int:post_id>", methods = ["DELETE"])
+@app.route("/delete_post/<int:post_id>", methods = ["DELETE"]) 
+# delete post by post ID. Not yet integrated into frontend, but kept from the Youtube tutorial.
+
 def delete_post(post_id):
     post = Post.query.get(post_id)
 
@@ -171,7 +188,7 @@ def delete_post(post_id):
     
 
 
-
+# Run the Flask app
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
