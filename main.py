@@ -5,6 +5,7 @@ from werkzeug.utils import secure_filename
 from models import *
 from sqlalchemy import *
 from datetime import datetime
+from urllib.parse import unquote
 
 
 
@@ -120,12 +121,13 @@ def create_post():
     post_data = {
         "userID": data["userID"],
         "title": data["title"],
+        "uniqueTitle_for_media": data["uniqueTitle_for_media"], # unique title for media file, to avoid conflicts
         
         "description": data["description"],
         "postType": data["postType"],
         "deadline": data["deadline"],
         "location": data["location"],
-        "mediaURL": secure_filename(data["mediaURL"]), # this just generates a secure filename, the actual file upload will handled separately
+        "mediaURL": secure_filename(data["mediaURL"]), # got rid of the secure_filename() here as it was causing issues with URLs. Same thing below
         "tags": data["tags"],
         "createdOn": datetime.now()
     }
@@ -157,19 +159,19 @@ def upload_image():
         return jsonify({'message': 'No media provided'}), 400
 
     image = request.files['media']
-    mediaURL = secure_filename(image.filename)
-    save_path = os.path.join(UPLOAD_FOLDER, mediaURL)
+    filename = secure_filename(image.filename) 
+    save_path = os.path.join(UPLOAD_FOLDER, filename)
     image.save(save_path)
 
-    # Construct URL (assuming backend runs on port 5001)
-    file_url = f"http://localhost:5001/{UPLOAD_FOLDER}/{mediaURL}"
+    file_url = f"http://localhost:5001/uploads/{filename}"
     return jsonify({'url': file_url}), 200
 
 
 
-@app.route('/uploads/<path:mediaURL>') # serve uploaded media files to clients
-def serve_uploaded_file(mediaURL):
-    return send_from_directory(UPLOAD_FOLDER, mediaURL)
+@app.route('/uploads/<filename>')
+def serve_uploaded_file(filename):
+    # secure_filename was already used on upload → safe to serve directly
+    return send_from_directory(UPLOAD_FOLDER, filename)
 
 
 @app.route("/delete_post/<int:post_id>", methods = ["DELETE"]) 

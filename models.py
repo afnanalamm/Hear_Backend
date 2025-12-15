@@ -4,11 +4,11 @@ from config import db
 class Address(db.Model):
     __tablename__ = 'addresses'
     addressID = db.Column(db.Integer, primary_key = True, autoincrement=True)
-    addressLine1 = db.Column(db.String(100), nullable = True)
-    addressLine2 = db.Column(db.String(100), nullable = True)
-    city = db.Column(db.String(50), nullable = True)
-    state = db.Column(db.String(50), nullable = True)
-    postCode = db.Column(db.String(20), nullable = True)
+    addressLine1 = db.Column(db.String(128), nullable = True)
+    addressLine2 = db.Column(db.String(128), nullable = True)
+    city = db.Column(db.String(64), nullable = True)
+    state = db.Column(db.String(64), nullable = True)
+    postCode = db.Column(db.String(32), nullable = True)
     
     def to_json(self):
         return {
@@ -23,11 +23,11 @@ class Address(db.Model):
 class Comment(db.Model):
     __tablename__ = 'comments'
     commentID = db.Column(db.Integer, primary_key = True, autoincrement=True)
-    postID = db.Column(db.String(80),  nullable = True)
-    userID = db.Column(db.String(80),  nullable = True)
+    postID = db.Column(db.String(64),  nullable = True)
+    userID = db.Column(db.String(64),  nullable = True)
 
-    commentText = db.Column(db.String(1000), nullable = True)
-    createdOn = db.Column(db.String(100), nullable = True)
+    commentText = db.Column(db.String(1280), nullable = True)
+    createdOn = db.Column(db.String(128), nullable = True)
 
     def to_json(self):
         return {
@@ -41,7 +41,7 @@ class Comment(db.Model):
 class Interaction(db.Model):
     __tablename__ = 'interactions'
     interactionsID = db.Column(db.Integer, primary_key = True, autoincrement=True)
-    postID = db.Column(db.String(80),  nullable = True)
+    postID = db.Column(db.String(64),  nullable = True)
 
     numAgree = db.Column(db.String(10), nullable = True)
     numDisagree = db.Column(db.String(10), nullable = True)
@@ -61,13 +61,13 @@ class Interaction(db.Model):
 class Notification(db.Model):
     __tablename__ = 'notifications'
     notificationID = db.Column(db.Integer, primary_key = True, autoincrement=True)
-    userID = db.Column(db.String(80),  nullable = True)
-    postID = db.Column(db.String(80),  nullable = True)
-    commentID = db.Column(db.String(80),  nullable = True)
-    fromUserID = db.Column(db.String(80),  nullable = True)
-    notificationType = db.Column(db.String(80),  nullable = True)
+    userID = db.Column(db.String(64),  nullable = True)
+    postID = db.Column(db.String(64),  nullable = True)
+    commentID = db.Column(db.String(64),  nullable = True)
+    fromUserID = db.Column(db.String(64),  nullable = True)
+    notificationType = db.Column(db.String(64),  nullable = True)
     isRead = db.Column(db.String(10), nullable = True)
-    createdOn = db.Column(db.String(100), nullable = True)
+    createdOn = db.Column(db.String(128), nullable = True)
 
     def to_json(self):
         return {
@@ -84,21 +84,22 @@ class Notification(db.Model):
 class Post(db.Model):
     __tablename__ = 'posts'
     postID = db.Column(db.Integer, primary_key = True, autoincrement=True)
-    userID = db.Column(db.String(80),  nullable = True)
+    userID = db.Column(db.String(64),  nullable = True)
 
-    interactionsID = db.Column(db.String(80))
-    title = db.Column(db.String(200), nullable = True)
+    interactionsID = db.Column(db.String(64))
+    title = db.Column(db.String(320), nullable = True)
+    uniqueTitle_for_media = db.Column(db.String(256), nullable = True)  # unique title for media file, to avoid conflicts
 
-    description = db.Column(db.String(10000), nullable = True)
-    postType = db.Column(db.String(100), nullable = True)
+    description = db.Column(db.String(12800), nullable = True)
+    postType = db.Column(db.String(128), nullable = True)
     mediaAttached = db.Column(db.String(12), nullable = True)
-    mediaType = db.Column(db.String(80), nullable = True)
-    mediaURL = db.Column(db.String(100), nullable = True)
+    mediaType = db.Column(db.String(64), nullable = True)
+    mediaURL = db.Column(db.String(128), nullable = True)
 
-    deadline = db.Column(db.String(100), nullable = True)
-    location = db.Column(db.String(100), nullable = True)
-    tags = db.Column(db.String(1000), nullable = True)
-    createdOn = db.Column(db.String(100), nullable = True)
+    deadline = db.Column(db.String(128), nullable = True)
+    location = db.Column(db.String(128), nullable = True)
+    tags = db.Column(db.String(1280), nullable = True)
+    createdOn = db.Column(db.String(128), nullable = True)
 
 
     def to_json(self):
@@ -106,6 +107,7 @@ class Post(db.Model):
             "postID" : self.postID,
             "userID" : self.userID,
             "title": self.title,
+            "uniqueTitle_for_media": self.uniqueTitle_for_media,
             "interactionsID" : self.interactionsID,
             "description": self.description,
             "postType" : self.postType,
@@ -123,19 +125,19 @@ class Post(db.Model):
 class User(db.Model):
     __tablename__ = 'users'
     userID = db.Column(db.Integer, primary_key = True, autoincrement=True)
-    addressID = db.Column(db.String(80), nullable = True)
+    addressID = db.Column(db.String(64), nullable = True)
 
-    username = db.Column(db.String(80),  nullable = True, unique=True, index= True)
-    firstName = db.Column(db.String(80),  nullable = True)
-    lastName = db.Column(db.String(80),  nullable = True)
-    dateOfBirth = db.Column(db.String(80), nullable = True)
+    username = db.Column(db.String(64),  nullable = True, unique=True, index= True)
+    firstName = db.Column(db.String(64),  nullable = True)
+    lastName = db.Column(db.String(64),  nullable = True)
+    dateOfBirth = db.Column(db.String(64), nullable = True)
 
-    contactNumber = db.Column(db.String(20), nullable = True)
-    emailAddress = db.Column(db.String(80), nullable = True, unique=True, index=True)
-    passwordHash = db.Column(db.String(300), nullable = True)
+    contactNumber = db.Column(db.String(32), nullable = True)
+    emailAddress = db.Column(db.String(64), nullable = True, unique=True, index=True)
+    passwordHash = db.Column(db.String(512), nullable = True)
 
     superUser = db.Column(db.String(10), nullable = True)
-    createdOn = db.Column(db.String(80), nullable = True)
+    createdOn = db.Column(db.String(64), nullable = True)
 
     def to_json(self):
         return {
