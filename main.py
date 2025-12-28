@@ -1,11 +1,16 @@
 from flask import request, jsonify, send_from_directory
-from config import app, db
+from config import *
 import os
 from werkzeug.utils import secure_filename
 from models import *
 from sqlalchemy import *
 from datetime import datetime
 from urllib.parse import unquote
+
+    # All of my searching algorithms have a best case time complexity of O(n).
+    # This can become a performance bottleneck with large number of posts and votes.
+    # I will have to optimize this in future by using better database queries.
+    # Alternatively, I will try to implement hashing techniques to speed up searches.
 
 
 
@@ -23,16 +28,31 @@ def check_login():
         # Fetch user by email
         user = db.session.execute(
             select(User).where(User.emailAddress == requestEmailAddress)
-        ).scalars().first() # Get the first matching user
+        ).scalars().first() # Get the first matching user        
 
         if user and user.passwordHash == requestPasswordHash: # Compare password hashes
+            access_token = create_access_token(identity=str(user.userID)) # this was causing the error.
+            
+            # user.userID is an integer (1), but Flask-JWT-Extended expects the identity (sub) to be a string by default in newer versions.
+            # When @jwt_required() runs on /allposts, it tries to do:
+            # emailAddress = get_jwt_identity()
+            # But since sub is a number (1), not a string, it fails validation with:
+            # "Subject must be a string"
+            # → Returns 422 with {"msg": "Subject must be a string"}
+
             print("User logged in:", user)
-            return jsonify({"message": "Login successful"}), 200 # Send successful login response
+
+            return jsonify({
+                "access_token": access_token
+            }), 200
+
+            return jsonify({"message": "Login successful", "userID": user.userID}), 200 # Send successful login response
         else:
             return jsonify({"message": "Incorrect Attempt"}), 400
 
     except Exception as e:
         return jsonify({"message": str(e)}), 400
+    
 
         
 
@@ -50,7 +70,7 @@ def create_account():
     # create new account
     )
     account_data = { # prepare account data, to be used to create new account object
-        
+
         "username": data["username"],
         "firstName": data["firstName"],
         "lastName": data["lastName"],
@@ -98,18 +118,46 @@ def create_account():
     
 
 @app.route("/allposts", methods= ["GET"]) # get all posts from database
+@jwt_required()
 def get_posts():
+    emailAddress = get_jwt_identity()
     allposts = Post.query.all()
 
+    userID = get_jwt_identity()  # Now a string like "1"
+    
+    allposts = Post.query.all()
     json_allposts = (list(map(lambda x: x.to_json(), allposts))) # convert all post objects to json format
     lastToFirst_allposts = json_allposts[::-1] # reverse order sorting to show latest posts first
 
-    return jsonify(lastToFirst_allposts), 200
+    lastToFirst_allposts_withUserVote = []
+    for post in lastToFirst_allposts:
+        user_reaction = Reaction.query.filter_by(postID=post["postID"], userID=int(userID)).first() # converting userID back to int for DB query
 
+        if user_reaction:
+            post["userHasVoted"] = True
+            if user_reaction.reactionType == "agree":
+                post["userVoteType"] = "agree"
+            else:
+                post["userVoteType"] = "disagree"
+                post["currentUserID"] = emailAddress
+        else:
+            post["userHasVoted"] = False
+            post["userVoteType"] = None
+            post["currentUserID"] = emailAddress
+        lastToFirst_allposts_withUserVote.append(post)
+
+    # I am very sure that this has a best case time complexity of O(n).
+    # This can become a performance bottleneck with large number of posts and votes.
+    # I will have to optimize this in future by using better database queries.
+
+    return jsonify(lastToFirst_allposts_withUserVote), 200
 
 @app.route("/create_post", methods=["POST"])
+@jwt_required()
 def create_post():
-    data = request.json
+    data = request.get_json()
+    userID_str = get_jwt_identity()
+    userID = int(userID_str)
     (
         # required_fields = ["userID", "description", "postType", "deadline", "location", "title"]
     
@@ -119,7 +167,7 @@ def create_post():
     )
     # Prepare post data
     post_data = {
-        "userID": data["userID"],
+        "userID": userID,
         "title": data["title"],
         "uniqueTitle_for_media": data["uniqueTitle_for_media"], # unique title for media file, to avoid conflicts
         
@@ -170,13 +218,80 @@ def upload_image():
 
 @app.route('/uploads/<filename>')
 def serve_uploaded_file(filename):
-    # secure_filename was already used on upload → safe to serve directly
+    # secure_filename was already used on upload - safe to serve directly
     return send_from_directory(UPLOAD_FOLDER, filename)
 
 
+@app.route("/vote", methods=["POST"])
+@jwt_required()
+def vote():
+    """
+    Receives vote from frontend: Agree or Disagree
+    Records postID, userID (from JWT), reactionType ("agree"/"disagree")
+    """
+    try:
+        data = request.json
+        postID = data.get("postID")
+        action = data.get("reactionType")  # "agree" or "disagree"
+
+        if not postID or not action:
+            return jsonify({"message": "Missing postID or reactionType"}), 400
+
+        # Get userID directly from JWT (it's a string like "1")
+        userID_str = get_jwt_identity()
+        userID = int(userID_str)  # Convert to int for database query
+
+        # Check if user already voted on this post
+        existing_vote = Reaction.query.filter_by(postID=postID, userID=userID).first()
+
+        # If same vote exists, remove it (toggle off)
+        if existing_vote and existing_vote.reactionType == action:
+            db.session.delete(existing_vote)
+            db.session.commit()
+
+            agree_count = Reaction.query.filter_by(postID=postID, reactionType="agree").count()
+            disagree_count = Reaction.query.filter_by(postID=postID, reactionType="disagree").count()
+
+            return jsonify({
+                "message": f"You just stopped {action}ing",
+                "agreeCount": agree_count,
+                "disagreeCount": disagree_count,
+                "userHasVoted": False,
+                "userVoteType": None
+            }), 200
+
+        # Otherwise, create new vote
+        new_reaction = Reaction(
+            postID=postID,
+            userID=userID,
+            reactionType=action,
+            timestamp=datetime.utcnow()
+        )
+
+        db.session.add(new_reaction)
+        db.session.commit()
+
+        # Get updated counts
+        agree_count = Reaction.query.filter_by(postID=postID, reactionType="agree").count()
+        disagree_count = Reaction.query.filter_by(postID=postID, reactionType="disagree").count()
+
+        print(f"[{action.upper()}] Post {postID} by user {userID} at {new_reaction.timestamp}")
+
+        return jsonify({
+            "message": "You have Voted",
+            "postID": postID,
+            "agreeCount": agree_count,
+            "disagreeCount": disagree_count,
+            "userHasVoted": True,
+            "userVoteType": action
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print("Vote error:", str(e))
+        return jsonify({"message": str(e)}), 500
 @app.route("/delete_post/<int:post_id>", methods = ["DELETE"]) 
 # delete post by post ID. Not yet integrated into frontend, but kept from the Youtube tutorial.
-
 def delete_post(post_id):
     post = Post.query.get(post_id)
 
