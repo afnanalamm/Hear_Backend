@@ -117,40 +117,37 @@ def create_account():
   
     
 
-@app.route("/allposts", methods= ["GET"]) # get all posts from database
+
+@app.route("/allposts", methods=["GET"])
 @jwt_required()
 def get_posts():
-    emailAddress = get_jwt_identity()
-    allposts = Post.query.all()
+    userID_str = get_jwt_identity()  # e.g. "1"
+    userID = int(userID_str)
 
-    userID = get_jwt_identity()  # Now a string like "1"
-    
     allposts = Post.query.all()
-    json_allposts = (list(map(lambda x: x.to_json(), allposts))) # convert all post objects to json format
-    lastToFirst_allposts = json_allposts[::-1] # reverse order sorting to show latest posts first
+    json_allposts = [post.to_json() for post in allposts]
+    json_allposts.reverse()
 
-    lastToFirst_allposts_withUserVote = []
-    for post in lastToFirst_allposts:
-        user_reaction = Reaction.query.filter_by(postID=post["postID"], userID=int(userID)).first() # converting userID back to int for DB query
+    result = []
+
+    for post in json_allposts:
+        user_reaction = Reaction.query.filter_by(
+            postID=post["postID"],
+            userID=userID
+        ).first()
+
+        post["currentUserID"] = userID
 
         if user_reaction:
             post["userHasVoted"] = True
-            if user_reaction.reactionType == "agree":
-                post["userVoteType"] = "agree"
-            else:
-                post["userVoteType"] = "disagree"
-                post["currentUserID"] = emailAddress
+            post["userVoteType"] = user_reaction.reactionType
         else:
             post["userHasVoted"] = False
             post["userVoteType"] = None
-            post["currentUserID"] = emailAddress
-        lastToFirst_allposts_withUserVote.append(post)
 
-    # I am very sure that this has a best case time complexity of O(n).
-    # This can become a performance bottleneck with large number of posts and votes.
-    # I will have to optimize this in future by using better database queries.
+        result.append(post)
 
-    return jsonify(lastToFirst_allposts_withUserVote), 200
+    return jsonify(result), 200
 
 @app.route("/create_post", methods=["POST"])
 @jwt_required()
@@ -290,6 +287,59 @@ def vote():
         db.session.rollback()
         print("Vote error:", str(e))
         return jsonify({"message": str(e)}), 500
+
+@app.route("/allcomments", methods=["GET"])
+@jwt_required()
+def get_comments():
+    try:
+        userID_str = get_jwt_identity()  # still validated by JWT
+        postID = request.args.get("postID", type=int)
+
+        if not postID:
+            return jsonify({"message": "postID query parameter is required"}), 400
+
+        comments = Comment.query.filter_by(postID=postID).all()
+        comments_json = [comment.to_json() for comment in comments]
+
+        return jsonify(comments_json), 200
+
+    except Exception as e:
+        return jsonify({"message": str(e)}), 500
+
+
+@app.route("/create_comment", methods=["POST"])
+@jwt_required()
+def create_comment():
+    data = request.get_json()
+    userID_str = get_jwt_identity()
+    userID = int(userID_str)
+
+
+    try:
+
+        data = request.json
+        postID = data.get("postID")
+        commentText = data.get("commentText")
+        createdOn = datetime.now()
+
+        # Prepare comment data
+        new_comment = Comment(
+            postID = postID,
+            userID = userID,
+            commentText = commentText,
+            createdOn = createdOn
+        )
+        db.session.add(new_comment)
+        
+        db.session.commit()
+        print("New comment added:", new_comment)
+    except Exception as e:
+        return jsonify({"message": str(e)}), 400
+        
+    
+    return jsonify({"message": "Comment added!"}), 201
+
+
 @app.route("/delete_post/<int:post_id>", methods = ["DELETE"]) 
 # delete post by post ID. Not yet integrated into frontend, but kept from the Youtube tutorial.
 def delete_post(post_id):
