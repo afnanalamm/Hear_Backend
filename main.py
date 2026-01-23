@@ -41,12 +41,15 @@ def check_login():
             # → Returns 422 with {"msg": "Subject must be a string"}
 
             print("User logged in:", user)
+            # additional_claims = {"isSuperuser": (True if user.superUser == "true" else False)}
+            additional_claims = {"isSuperuser": user.superUser }
 
             return jsonify({
-                "access_token": access_token
+                "access_token": access_token,
+                "additional_claims": additional_claims,
             }), 200
 
-            return jsonify({"message": "Login successful", "userID": user.userID}), 200 # Send successful login response
+            
         else:
             return jsonify({"message": "Incorrect Attempt"}), 400
 
@@ -155,6 +158,7 @@ def create_post():
     data = request.get_json()
     userID_str = get_jwt_identity()
     userID = int(userID_str)
+    username = User.query.filter_by(userID=userID).first().username
     (
         # required_fields = ["userID", "description", "postType", "deadline", "location", "title"]
     
@@ -167,6 +171,7 @@ def create_post():
         "userID": userID,
         "title": data["title"],
         "uniqueTitle_for_media": data["uniqueTitle_for_media"], # unique title for media file, to avoid conflicts
+        "username": username,
         
         "description": data["description"],
         "postType": data["postType"],
@@ -313,6 +318,7 @@ def create_comment():
     data = request.get_json()
     userID_str = get_jwt_identity()
     userID = int(userID_str)
+    username = User.query.filter_by(userID=userID).first().username
 
 
     try:
@@ -326,6 +332,7 @@ def create_comment():
         new_comment = Comment(
             postID = postID,
             userID = userID,
+            username = username,
             commentText = commentText,
             createdOn = createdOn
         )
@@ -338,6 +345,43 @@ def create_comment():
         
     
     return jsonify({"message": "Comment added!"}), 201
+
+# main.py — ADD
+@app.route("/moderate_post", methods=["POST"])
+@jwt_required()
+def moderate_post():
+    try:
+        data = request.json
+        postID = data.get("postID")
+        action = data.get("action")  # "approve" | "reject"
+
+        if action not in ["approve", "reject"]:
+            return jsonify({"message": "Invalid action"}), 400
+
+        userID = int(get_jwt_identity())
+        user = User.query.get(userID)
+
+        if not user or user.superUser != "true":
+            return jsonify({"message": "Forbidden"}), 403
+
+        post = Post.query.get(postID)
+        if not post:
+            return jsonify({"message": "Post not found"}), 404
+
+        post.approvalStatus = "approved" if action == "approve" else "rejected"
+        post.approvedBy = userID
+        post.approvedOn = datetime.now().isoformat()
+
+        db.session.commit()
+
+        return jsonify({
+            "message": f"Post {action}d",
+            "approvalStatus": post.approvalStatus
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"message": str(e)}), 500
 
 
 @app.route("/delete_post/<int:post_id>", methods = ["DELETE"]) 

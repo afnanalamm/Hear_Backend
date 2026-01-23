@@ -38,10 +38,10 @@ class User(db.Model):
     dateOfBirth = db.Column(db.String(64), nullable=True)
 
     contactNumber = db.Column(db.String(32), nullable=True)
-    emailAddress = db.Column(db.String(64), nullable=True, unique=True, index=True)
+    emailAddress = db.Column(db.String(64), nullable=True, unique=False, index=True)
     passwordHash = db.Column(db.String(512), nullable=True)
 
-    superUser = db.Column(db.String(8), nullable=True)
+    superUser = db.Column(db.String, nullable=True)
     createdOn = db.Column(db.String(64), nullable=True)
 
     # Relationships
@@ -73,11 +73,12 @@ class User(db.Model):
             "createdOn": self.createdOn
         }
 
-''
+
 class Post(db.Model):
     __tablename__ = 'posts'
     postID = db.Column(db.Integer, primary_key=True, autoincrement=True)
     userID = db.Column(db.Integer, db.ForeignKey('users.userID'), nullable=True)
+    username = db.Column(db.String(128), nullable=True)
 
     interactionsID = db.Column(db.String(64))
     title = db.Column(db.String(320), nullable=True)
@@ -94,6 +95,10 @@ class Post(db.Model):
     tags = db.Column(db.String(1280), nullable=True)
     createdOn = db.Column(db.String(128), nullable=True)
 
+    approvalStatus = db.Column(db.String(32), default="pending")  # pending | approved | rejected
+    approvedBy = db.Column(db.Integer, nullable=True)
+    approvedOn = db.Column(db.String(128), nullable=True)
+
     # Relationships
     user = relationship("User", back_populates="posts")
     comments = relationship("Comment", back_populates="post")
@@ -108,6 +113,7 @@ class Post(db.Model):
         return {
             "postID": self.postID,
             "userID": self.userID,
+            "username": self.username,
             "title": self.title,
             "uniqueTitle_for_media": self.uniqueTitle_for_media,
             "interactionsID": self.interactionsID,
@@ -121,7 +127,10 @@ class Post(db.Model):
             "tags": self.tags,
             "createdOn": self.createdOn,
             "agreeCount": agree_count,
-            "disagreeCount": disagree_count
+            "disagreeCount": disagree_count,
+            "approvalStatus": self.approvalStatus,
+            "approvedBy": self.approvedBy,
+            "approvedOn": self.approvedOn,
         }
 
 
@@ -130,6 +139,7 @@ class Comment(db.Model):
     commentID = db.Column(db.Integer, primary_key=True, autoincrement=True)
     postID = db.Column(db.Integer, db.ForeignKey('posts.postID'), nullable=True)
     userID = db.Column(db.Integer, db.ForeignKey('users.userID'), nullable=True)
+    username = db.Column(db.String(128), nullable=True)
 
     commentText = db.Column(db.String(1280), nullable=True)
     createdOn = db.Column(db.String(128), nullable=True)
@@ -143,6 +153,7 @@ class Comment(db.Model):
             "commentID": self.commentID,
             "postID": self.postID,
             "userID": self.userID,
+            "username": self.username,
             "commentText": self.commentText,
             "createdOn": self.createdOn
         }
@@ -212,34 +223,6 @@ class Notification(db.Model):
             "fromUserID": self.fromUserID,
             "postID": self.postID,
             "commentID": self.commentID,
-            "notificationType": self.notificationType,
-            "isRead": self.isRead,
-            "createdOn": self.createdOn
-        }
-
-    __tablename__ = 'notifications'
-    notificationID = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    userID = db.Column(db.Integer, db.ForeignKey('users.userID'), nullable=True)
-    postID = db.Column(db.Integer, db.ForeignKey('posts.postID'), nullable=True)
-    commentID = db.Column(db.Integer, db.ForeignKey('comments.commentID'), nullable=True)
-    fromUserID = db.Column(db.Integer, db.ForeignKey('users.userID'), nullable=True)
-    notificationType = db.Column(db.String(64), nullable=True)
-    isRead = db.Column(db.String(10), nullable=True)
-    createdOn = db.Column(db.String(128), nullable=True)
-
-    # Relationships
-    user = relationship("User", foreign_keys=[userID], back_populates="notifications")
-    post = relationship("Post", back_populates="notifications")
-    comment = relationship("Comment")
-    from_user = relationship("User", foreign_keys=[fromUserID])
-
-    def to_json(self):
-        return {
-            "notificationID": self.notificationID,
-            "userID": self.userID,
-            "postID": self.postID,
-            "commentID": self.commentID,
-            "fromUserID": self.fromUserID,
             "notificationType": self.notificationType,
             "isRead": self.isRead,
             "createdOn": self.createdOn
