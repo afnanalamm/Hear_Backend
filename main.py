@@ -6,6 +6,7 @@ from models import *
 from sqlalchemy import *
 from datetime import datetime
 from urllib.parse import unquote
+from hashlib import sha256
 
     # All of my searching algorithms have a best case time complexity of O(n).
     # This can become a performance bottleneck with large number of posts and votes.
@@ -24,38 +25,37 @@ def check_login():
         login_data = request.json
         requestPasswordHash = login_data["passwordHash"]
         requestEmailAddress = login_data["emailAddress"]
+        double_hashed_password = str(sha256(requestPasswordHash))
+         # double hash the password for security
 
         # Fetch user by email
         user = db.session.execute(
             select(User).where(User.emailAddress == requestEmailAddress)
         ).scalars().first() # Get the first matching user        
 
-        if user and user.passwordHash == requestPasswordHash: # Compare password hashes
-            access_token = create_access_token(identity=str(user.userID)) # this was causing the error.
-            
-            # user.userID is an integer (1), but Flask-JWT-Extended expects the identity (sub) to be a string by default in newer versions.
-            # When @jwt_required() runs on /allposts, it tries to do:
-            # emailAddress = get_jwt_identity()
-            # But since sub is a number (1), not a string, it fails validation with:
-            # "Subject must be a string"
-            # → Returns 422 with {"msg": "Subject must be a string"}
-
+        if user and user.passwordHash == double_hashed_password: # Compare password hashes
             print("User logged in:", user)
-            # additional_claims = {"isSuperuser": (True if user.superUser == "true" else False)}
-            additional_claims = {"isSuperuser": user.superUser }
-
-            return jsonify({
-                "access_token": access_token,
-                "additional_claims": additional_claims,
-            }), 200
-
-            
+            return jsonify({"message": "Login successful", "userID": user.userID}), 200 # Send successful login response
         else:
             return jsonify({"message": "Incorrect Attempt"}), 400
 
     except Exception as e:
         return jsonify({"message": str(e)}), 400
     
+login_data = request.json
+requestPasswordHash = login_data["passwordHash"]
+requestEmailAddress = login_data["emailAddress"]
+
+
+# Fetch user by email
+user = db.session.execute(
+select(User).where(User.emailAddress == requestEmailAddress)
+).scalars().first() # Get the first matching user
+
+
+@app.route("/check_login", methods=["POST"]) # rudimentary login check function
+def check_login():
+try:
 
         
 
@@ -64,7 +64,6 @@ def create_account():
     data = request.json
     required_fields = ["firstName", "lastName", "dateOfBirth", "contactNumber", "emailAddress", "username"] 
     # can't create account without these fields
-    
     (
         # Check for required fields
     # if not all(data.get(field) for field in required_fields):
@@ -81,7 +80,7 @@ def create_account():
         "contactNumber": data["contactNumber"],
         "emailAddress": data["emailAddress"],
 
-        "passwordHash": data["passwordHash"],
+        "passwordHash": str(sha256(data["passwordHash"])),
         "superUser": data["superUser"],
         "createdOn": datetime.now()
 

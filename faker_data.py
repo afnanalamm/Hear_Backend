@@ -51,14 +51,14 @@ def create_superuser():
         db.session.flush()
 
         user = User(
-            username="admin",
-            firstName="Admin",
-            lastName="User",
-            dateOfBirth="1985-01-01",
+            username="a",
+            firstName="a",
+            lastName="a",
+            dateOfBirth="1901-01-01",
             contactNumber="07123456789",
-            emailAddress="admin@example.com",
-            passwordHash="pbkdf2:sha256:600000$...your_hashed_password...",  # Use proper hash!
-            superUser="true",
+            emailAddress="a",
+            passwordHash="594e519ae499312b29433b7dd8a97ff068defcba9755b6d5d00e84c524d67b06",  # Use proper hash!
+            superUser="false",
             createdOn=str(datetime.now()),
             addressID=address.addressID
         )
@@ -66,7 +66,7 @@ def create_superuser():
         db.session.commit()
         print("Superuser created.")
 
-def create_fake_users(n=15):
+def create_fake_users(n):
     user_ids = []  # Store only IDs to avoid detached objects
     with app.app_context():
         for _ in range(n):
@@ -102,7 +102,7 @@ def create_fake_users(n=15):
         print(f"Created {n} fake users.")
     return user_ids
 
-def create_fake_posts(user_ids, n_posts_total=30):
+def create_fake_posts(user_ids, n_posts_total=6):
     posts = []
     with app.app_context():
         for _ in range(n_posts_total):
@@ -111,15 +111,15 @@ def create_fake_posts(user_ids, n_posts_total=30):
             user = User.query.get(user_id)
 
             topic = random.choice(POST_TOPICS)
-            title = f"Petition: {fake.sentence(nb_words=6).capitalize()}"
+            title = f"Petition: TEST"
 
-            image_url, credit = get_random_image_url(topic)
+            image_url  = "TEST.png"
 
             post = Post(
                 userID=user_id,
                 username=user.username,  # Safe because queried inside session
                 title=title,
-                description=fake.paragraph(nb_sentences=8) + "\n\n" + credit,
+                description=fake.paragraph(nb_sentences=8) + "\n\n",
                 postType=random.choice(["petition", "news", "discussion"]),
                 mediaAttached="true",
                 mediaType="image",
@@ -171,11 +171,11 @@ if __name__ == "__main__":
 
     print("Seeding database...\n")
 
-    create_superuser()
+    # create_superuser()
 
     fake_user_ids = create_fake_users(n=15)
 
-    fake_post_ids = create_fake_posts(user_ids=fake_user_ids, n_posts_total=30)
+    fake_post_ids = create_fake_posts(user_ids=fake_user_ids, n_posts_total=12288)
 
     create_fake_comments(post_ids=fake_post_ids)
 
