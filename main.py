@@ -19,44 +19,33 @@ UPLOAD_FOLDER = 'uploads' # constant name for for folder to store all uploaded m
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-@app.route("/check_login", methods=["POST"]) # rudimentary login check function
+
+@app.route("/check_login", methods=["POST"])
 def check_login():
     try:
-        login_data = request.json
-        requestPasswordHash = login_data["passwordHash"]
-        requestEmailAddress = login_data["emailAddress"]
-        double_hashed_password = str(sha256(requestPasswordHash))
-         # double hash the password for security
+        data = request.get_json()
 
-        # Fetch user by email
+        requestPasswordHash = data["passwordHash"]
+        requestEmailAddress = data["emailAddress"]
+
         user = db.session.execute(
             select(User).where(User.emailAddress == requestEmailAddress)
-        ).scalars().first() # Get the first matching user        
+        ).scalars().first()
 
-        if user and user.passwordHash == double_hashed_password: # Compare password hashes
-            print("User logged in:", user)
-            return jsonify({"message": "Login successful", "userID": user.userID}), 200 # Send successful login response
-        else:
-            return jsonify({"message": "Incorrect Attempt"}), 400
+        if user and user.passwordHash == requestPasswordHash:
+            access_token = create_access_token(identity=str(user.userID))
+
+            additional_claims = {"isSuperuser": user.superUser}
+
+            return jsonify({
+                "access_token": access_token,
+                "additional_claims": additional_claims,
+            }), 200
+
+        return jsonify({"message": "Incorrect Attempt"}), 400
 
     except Exception as e:
         return jsonify({"message": str(e)}), 400
-    
-login_data = request.json
-requestPasswordHash = login_data["passwordHash"]
-requestEmailAddress = login_data["emailAddress"]
-
-
-# Fetch user by email
-user = db.session.execute(
-select(User).where(User.emailAddress == requestEmailAddress)
-).scalars().first() # Get the first matching user
-
-
-@app.route("/check_login", methods=["POST"]) # rudimentary login check function
-def check_login():
-try:
-
         
 
 @app.route("/create_account", methods=["POST"]) # create new user account
